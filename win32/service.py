@@ -195,6 +195,7 @@ class DDProcess(object):
     """
     DEFAULT_MAX_RESTARTS = 5
     _RESTART_TIMEFRAME = 3600
+    _STOP_TIMEOUT = 3
 
     def __init__(self, name, command, env, enabled=True, max_restarts=None):
         self._name = name
@@ -220,10 +221,14 @@ class DDProcess(object):
     def stop(self):
         if self._proc is not None and self._proc.is_running():
             log.info("Stopping %s...", self._name)
+            for child_proc in self._proc.children():
+                child_proc.kill()
+
             self._proc.terminate()
 
-            psutil.wait_procs([self._proc], timeout=3)
+            self._proc.wait(timeout=self._STOP_TIMEOUT)
 
+            # Should never happen, terminate is equivalent to kill on Windows
             if self._proc.is_running():
                 log.debug("%s didn't exit. Killing it.", self._name)
                 self._proc.kill()
@@ -280,6 +285,10 @@ class JMXFetchProcess(DDProcess):
         """
         if self._proc is not None and self._proc.is_running():
             JMXFiles.write_exit_file()
+            try:
+                self._proc.wait(timeout=self._STOP_TIMEOUT)
+            except psutil.TimeoutExpired:
+                log.debug("JMXFetch process didn't stop in %ss, killing it", self._STOP_TIMEOUT)
 
         super(JMXFetchProcess, self).stop()
 
