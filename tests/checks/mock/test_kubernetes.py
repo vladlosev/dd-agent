@@ -411,6 +411,9 @@ class TestKubeutil(unittest.TestCase):
         with mock.patch('utils.kubernetes.kubeutil.os.path.exists', return_value=False):
             self.assertEqual(self.kubeutil._init_tls_settings(instance), {'kubelet_verify': True, 'bearer_token': 'tkn'})
 
+        self.assertEqual(self.kubeutil._init_tls_settings(
+            {'apiserver_client_crt': 'foo.crt'}), {'kubelet_verify': True, 'bearer_token': 'tkn'})
+
     ##### Test _locate_kubelet #####
 
     # we support connection to kubelet in 3 modes
@@ -516,19 +519,6 @@ class TestKubeutil(unittest.TestCase):
         self.kubeutil.get_kube_labels(excluded_keys='bar')
         retrieve_pods_list.assert_called_once()
         extract_kube_labels.assert_called_once_with('foo', excluded_keys='bar')
-
-    @mock.patch('utils.kubernetes.kubeutil.KubeUtil.get_auth_token', return_value=None)
-    def test_init_tls_settings(self, get_tkn):
-        self.assertEqual(self.kubeutil._init_tls_settings({}), {})
-        self.assertEqual(self.kubeutil._init_tls_settings({'apiserver_client_crt': 'foo.crt'}), {})
-
-        instance = {'apiserver_client_crt': 'foo.crt', 'apiserver_client_key': 'foo.key', 'apiserver_ca_cert': 'ca.crt'}
-        with mock.patch('utils.kubernetes.kubeutil.os.path.exists', return_value=True):
-            expected_res = {'apiserver_client_cert': ('foo.crt', 'foo.key'), 'apiserver_cacert': 'ca.crt'}
-            self.assertEqual(self.kubeutil._init_tls_settings(instance), expected_res)
-
-        with mock.patch('utils.kubernetes.kubeutil.os.path.exists', return_value=False):
-            self.assertEqual(self.kubeutil._init_tls_settings(instance), {})
 
     def test_extract_kube_labels(self):
         """
